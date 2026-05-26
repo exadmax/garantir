@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -10,7 +9,6 @@ import '../../products/data/product_repository.dart';
 import '../../products/domain/product.dart';
 import '../../products/presentation/product_form_page.dart';
 import '../../products/presentation/products_page.dart';
-import '../../../shared/web_apk_download_link.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const _brand     = Color(0xFF1F6E8C);
@@ -202,11 +200,6 @@ class _DashBody extends StatelessWidget {
                 badgeCount: nSoon + nExpired,
                 onSettings: () => _showSettings(context),
               ),
-              if (kIsWeb)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: _WebDownloadCard(),
-                ),
               Padding(
                 padding: const EdgeInsets.only(top: -56),
                 child: Padding(
@@ -435,64 +428,6 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _WebDownloadCard extends StatelessWidget {
-  const _WebDownloadCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: _brand.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.download_rounded, color: _brand),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Baixar APK',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _dark),
-                ),
-                SizedBox(height: 3),
-                Text(
-                  'Download direto da versão Android.',
-                  style: TextStyle(fontSize: 12.5, color: _muted),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          WebApkDownloadLink(
-            url: Uri.base.resolve('/app-release.apk').toString(),
-            label: 'Download',
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _IconBtn extends StatelessWidget {
   const _IconBtn({required this.child, required this.onTap, this.badge = 0});
