@@ -63,6 +63,26 @@ flutterfire configure
 
 7. Substitua o arquivo `lib/firebase_options.dart` placeholder pelo gerado automaticamente.
 
+### Firebase Storage no Web (CORS)
+
+Para upload de imagens em deploy Web (ex.: GitHub Pages), o bucket precisa aceitar a origem do frontend.
+Sem isso, o navegador bloqueia o preflight (`OPTIONS`) com erro de CORS.
+
+1. Ajuste as origens permitidas em `storage.cors.json` (inclua seu dominio de producao).
+2. Aplique no bucket:
+
+```bash
+bash scripts/apply_storage_cors.sh omegabackend-88ebc.firebasestorage.app
+```
+
+3. Publique as regras do Storage:
+
+```bash
+firebase deploy --only storage
+```
+
+Observacao: CORS do bucket nao e publicado pelo `firebase deploy`; ele precisa ser aplicado via `gcloud` ou `gsutil` (o script acima faz isso).
+
 ## Como executar
 
 ```bash
