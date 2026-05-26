@@ -39,6 +39,7 @@ class _AuthGateState extends State<_AuthGate> {
     if (kIsWeb) {
       FirebaseAuth.instance.getRedirectResult().catchError((Object e) {
         debugPrint('getRedirectResult: $e');
+        return null;
       });
     }
     FirebaseAuth.instance.authStateChanges().listen((user) {

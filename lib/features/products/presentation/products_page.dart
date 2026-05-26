@@ -120,10 +120,16 @@ class _ProductsPageState extends State<ProductsPage> {
       body: StreamBuilder<List<ProductCategory>>(
         stream: _repo.watchCategories(),
         builder: (ctx, catSnap) {
+          if (catSnap.hasError) {
+            return _StreamErrorView(error: catSnap.error);
+          }
           final cats = catSnap.data ?? const <ProductCategory>[];
           return StreamBuilder<List<Product>>(
             stream: _repo.watchProducts(),
             builder: (ctx, snap) {
+              if (snap.hasError) {
+                return _StreamErrorView(error: snap.error);
+              }
               final all = snap.data ?? const <Product>[];
               final nActive   = all.where((p) { final s = _status(p); return s == _Status.active || s == _Status.warn; }).length;
               final nSoon     = all.where((p) => _status(p) == _Status.soon).length;
@@ -489,6 +495,36 @@ class _EmptyState extends StatelessWidget {
           style: const TextStyle(fontSize: 13, color: _muted),
         ),
       ]),
+    );
+  }
+}
+
+// ─── Stream error state ───────────────────────────────────────────────────────
+class _StreamErrorView extends StatelessWidget {
+  const _StreamErrorView({this.error});
+  final Object? error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.cloud_off_outlined, size: 52, color: _muted),
+          const SizedBox(height: 16),
+          const Text(
+            'Não foi possível carregar os dados',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1A1F26)),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            error?.toString() ?? 'Verifique sua conexão e tente novamente.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, color: _muted),
+          ),
+        ]),
+      ),
     );
   }
 }

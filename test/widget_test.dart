@@ -1,9 +1,13 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:soyyo/app/app.dart';
+import 'package:soyyo/features/splash/presentation/splash_page.dart';
 
 void main() {
-  testWidgets('Renderiza tela principal', (tester) async {
-    await tester.pumpWidget(const SoyYoApp());
-    expect(find.text('Garantir - Produtos'), findsOneWidget);
+  testWidgets('SplashPage renderiza sem Firebase', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: SplashPage()),
+    );
+    await tester.pump();
+    expect(find.text('Garantir'), findsOneWidget);
   });
 }

@@ -12,7 +12,11 @@ class ProductRepository {
   final FirebaseFirestore _firestore;
   final Uuid _uuid = const Uuid();
 
-  String get _uid => FirebaseAuth.instance.currentUser!.uid;
+  String get _uid {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) throw StateError('Usuário não autenticado');
+    return uid;
+  }
 
   CollectionReference<Map<String, dynamic>> get _productsRef =>
       _firestore.collection('users').doc(_uid).collection('products');
@@ -24,7 +28,10 @@ class ProductRepository {
     return _productsRef
         .orderBy('warrantyEndDate')
         .snapshots()
-        .map((snap) => snap.docs.map((d) => Product.fromDoc(d)).toList());
+        .map((snap) => snap.docs.map((d) => Product.fromDoc(d)).toList())
+        .handleError((Object e) {
+          throw Exception('Erro ao carregar produtos: $e');
+        });
   }
 
   Future<String> saveProduct(Product product) async {
@@ -53,7 +60,10 @@ class ProductRepository {
         .snapshots()
         .map((snap) => snap.docs
             .map((d) => ProductCategory.fromMap(d.id, d.data()))
-            .toList());
+            .toList())
+        .handleError((Object e) {
+          throw Exception('Erro ao carregar categorias: $e');
+        });
   }
 
   Future<void> saveCategory(ProductCategory category) async {

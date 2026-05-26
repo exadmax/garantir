@@ -125,9 +125,15 @@ class _DashboardPageState extends State<DashboardPage> {
       body: StreamBuilder<List<ProductCategory>>(
         stream: _repo.watchCategories(),
         builder: (ctx, catSnap) {
+          if (catSnap.hasError) {
+            return _FirestoreErrorView(error: catSnap.error);
+          }
           return StreamBuilder<List<Product>>(
             stream: _repo.watchProducts(),
             builder: (ctx, prodSnap) {
+              if (prodSnap.hasError) {
+                return _FirestoreErrorView(error: prodSnap.error);
+              }
               return _DashBody(
                 products: prodSnap.data ?? [],
                 categories: catSnap.data ?? [],
@@ -948,6 +954,36 @@ class _NavItem extends StatelessWidget {
           Icon(icon, color: color, size: 22),
           const SizedBox(height: 3),
           Text(label, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: color)),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─── Firestore error view ─────────────────────────────────────────────────────
+class _FirestoreErrorView extends StatelessWidget {
+  const _FirestoreErrorView({this.error});
+  final Object? error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.cloud_off_outlined, size: 52, color: _muted),
+          const SizedBox(height: 16),
+          const Text(
+            'Não foi possível carregar os dados',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _dark),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            error?.toString() ?? 'Verifique sua conexão e tente novamente.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 13, color: _muted),
+          ),
         ]),
       ),
     );
