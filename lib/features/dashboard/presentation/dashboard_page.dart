@@ -188,22 +188,23 @@ class _DashBody extends StatelessWidget {
     final initials = raw.split(RegExp(r'\s+')).where((s) => s.isNotEmpty)
         .take(2).map((s) => s[0].toUpperCase()).join();
 
-    return Stack(
+    return Column(
       children: [
-        SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _Header(
-                name: name, initials: initials,
-                healthPct: healthPct, nActive: nActive, nSoon: nSoon, nExpired: nExpired,
-                badgeCount: nSoon + nExpired,
-                onSettings: () => _showSettings(context),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: -56),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _Header(
+                  name: name, initials: initials,
+                  healthPct: healthPct, nActive: nActive, nSoon: nSoon, nExpired: nExpired,
+                  badgeCount: nSoon + nExpired,
+                  onSettings: () => _showSettings(context),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: -56),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -330,10 +331,8 @@ class _DashBody extends StatelessWidget {
             ],
           ),
         ),
-        Positioned(
-          bottom: 0, left: 0, right: 0,
-          child: _BottomNav(onLogout: onLogout),
         ),
+        _BottomNav(onLogout: onLogout),
       ],
     );
   }

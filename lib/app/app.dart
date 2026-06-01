@@ -1,5 +1,4 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
@@ -36,12 +35,6 @@ class _AuthGateState extends State<_AuthGate> {
   @override
   void initState() {
     super.initState();
-    if (kIsWeb) {
-      FirebaseAuth.instance.getRedirectResult().catchError((Object e) {
-        debugPrint('getRedirectResult: $e');
-        return null;
-      });
-    }
     FirebaseAuth.instance.authStateChanges().listen((user) {
       if (mounted) {
         setState(() {

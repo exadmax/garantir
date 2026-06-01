@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../domain/auth_service.dart';
 import 'register_page.dart';
@@ -54,10 +55,22 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await _authService.signInWithGoogle();
     } on FirebaseAuthException catch (e) {
-      if (e.code == 'popup-closed-by-user' || e.code == 'cancelled-popup-request') return;
+      const silentCodes = {
+        'popup-closed-by-user',
+        'cancelled-popup-request',
+        'web-context-cancelled',
+      };
+      if (silentCodes.contains(e.code)) return;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(AuthService.errorMessage(e))),
+        );
+      }
+    } on PlatformException catch (e) {
+      if (e.code == 'sign_in_canceled') return;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message ?? 'Erro ao entrar com Google.')),
         );
       }
     } catch (e) {
