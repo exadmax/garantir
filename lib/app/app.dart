@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -31,11 +33,12 @@ class _AuthGateState extends State<_AuthGate> {
   bool _splashDone = false;
   bool _authResolved = false;
   User? _user;
+  StreamSubscription<User?>? _authSub;
 
   @override
   void initState() {
     super.initState();
-    FirebaseAuth.instance.authStateChanges().listen((user) {
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
       if (mounted) {
         setState(() {
           _user = user;
@@ -43,6 +46,12 @@ class _AuthGateState extends State<_AuthGate> {
         });
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
   }
 
   void _onSplashDone() {

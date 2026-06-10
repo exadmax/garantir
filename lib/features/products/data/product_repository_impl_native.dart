@@ -19,12 +19,19 @@ class ProductRepository {
   final FirebaseFirestore _firestore;
   final Uuid _uuid = const Uuid();
 
-  static const _syncInterval = Duration(days: 14);
+  // Curto o bastante para o Android refletir alterações feitas na web a cada
+  // abertura do app; longo o bastante para não martelar o Firestore em
+  // navegações de ida e volta dentro da mesma sessão.
+  static const _syncInterval = Duration(minutes: 15);
 
   // Only accessed on Android; never called on web (all paths guarded by kIsWeb).
   Isar get _isar => IsarDatabase.instance;
 
-  String get _uid => FirebaseAuth.instance.currentUser!.uid;
+  String get _uid {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) throw StateError('Usuário não autenticado');
+    return uid;
+  }
 
   CollectionReference<Map<String, dynamic>> get _productsRef =>
       _firestore.collection('users').doc(_uid).collection('products');
@@ -71,7 +78,9 @@ class ProductRepository {
         await _isar.productIsarSchemas.put(ProductIsarSchema.fromDomain(updated));
       });
       // Fire-and-forget on Android: Isar stream already updated the UI.
-      _productsRef.doc(docId).set(updated.toMap(), SetOptions(merge: true));
+      _fireAndForget(
+        _productsRef.doc(docId).set(updated.toMap(), SetOptions(merge: true)),
+      );
     }
     return docId;
   }
@@ -83,7 +92,7 @@ class ProductRepository {
       await _isar.writeTxn(() async {
         await _isar.productIsarSchemas.delete(fastHash(productId));
       });
-      _productsRef.doc(productId).delete();
+      _fireAndForget(_productsRef.doc(productId).delete());
     }
   }
 
@@ -117,7 +126,9 @@ class ProductRepository {
       await _isar.writeTxn(() async {
         await _isar.categoryIsarSchemas.put(CategoryIsarSchema.fromDomain(updated));
       });
-      _categoriesRef.doc(docId).set(updated.toMap(), SetOptions(merge: true));
+      _fireAndForget(
+        _categoriesRef.doc(docId).set(updated.toMap(), SetOptions(merge: true)),
+      );
     }
   }
 
@@ -128,7 +139,7 @@ class ProductRepository {
       await _isar.writeTxn(() async {
         await _isar.categoryIsarSchemas.delete(fastHash(categoryId));
       });
-      _categoriesRef.doc(categoryId).delete();
+      _fireAndForget(_categoriesRef.doc(categoryId).delete());
     }
   }
 
@@ -150,20 +161,48 @@ class ProductRepository {
     }
   }
 
+  /// Lê os produtos uma única vez (Isar no Android, Firestore na web).
+  /// Usado para reagendar notificações locais após um sync.
+  Future<List<Product>> getProductsOnce() async {
+    if (kIsWeb) {
+      final snap = await _productsRef.orderBy('warrantyEndDate').get();
+      return snap.docs.map(Product.fromDoc).toList();
+    }
+    final list = await _isar.productIsarSchemas.where().findAll();
+    return list.map((s) => s.toDomain()).toList();
+  }
+
   // ── Periodic Firestore sync (Android only) ────────────────────────────────
 
   /// No-op on web — Firestore streams already keep the UI in sync.
-  Future<void> syncIfNeeded() async {
-    if (kIsWeb) return;
-    if (!await _isSyncDue()) return;
-    await _fetchFromFirestore();
-    await _markSynced();
-  }
+  /// Retorna `true` quando um sync com o Firestore foi executado.
+  Future<bool> syncIfNeeded() async {
+    if (kIsWeb) return false;
 
-  Future<bool> _isSyncDue() async {
+    final uid = _uid;
     final meta = await _isar.syncMetaIsarSchemas.get(1);
-    if (meta?.lastSyncAt == null) return true;
-    return DateTime.now().difference(meta!.lastSyncAt!) >= _syncInterval;
+    final accountChanged = meta?.uid != uid;
+
+    if (accountChanged) {
+      // Outro usuário (ou primeiro login) neste aparelho: nunca exibir os
+      // dados locais da conta anterior.
+      await _isar.writeTxn(() async {
+        await _isar.productIsarSchemas.clear();
+        await _isar.categoryIsarSchemas.clear();
+        await _isar.syncMetaIsarSchemas.put(
+          SyncMetaIsarSchema()
+            ..uid = uid
+            ..lastSyncAt = null,
+        );
+      });
+    } else if (meta?.lastSyncAt != null &&
+        DateTime.now().difference(meta!.lastSyncAt!) < _syncInterval) {
+      return false;
+    }
+
+    await _fetchFromFirestore();
+    await _markSynced(uid);
+    return true;
   }
 
   Future<void> _fetchFromFirestore() async {
@@ -179,17 +218,32 @@ class ProductRepository {
             ))
         .toList();
 
+    // clear + putAll na mesma transação: exclusões feitas em outro
+    // dispositivo (ex.: web) são propagadas para o cache local.
     await _isar.writeTxn(() async {
+      await _isar.productIsarSchemas.clear();
       await _isar.productIsarSchemas.putAll(productSchemas);
+      await _isar.categoryIsarSchemas.clear();
       await _isar.categoryIsarSchemas.putAll(categorySchemas);
     });
   }
 
-  Future<void> _markSynced() async {
+  Future<void> _markSynced(String uid) async {
     await _isar.writeTxn(() async {
       await _isar.syncMetaIsarSchemas.put(
-        SyncMetaIsarSchema()..lastSyncAt = DateTime.now(),
+        SyncMetaIsarSchema()
+          ..uid = uid
+          ..lastSyncAt = DateTime.now(),
       );
+    });
+  }
+
+  /// Escritas no Firestore feitas sem await (a UI já foi atualizada pelo
+  /// Isar): loga a falha em vez de deixar uma exceção assíncrona solta.
+  /// Offline, o SDK do Firestore enfileira a escrita e reenvia sozinho.
+  void _fireAndForget(Future<void> future) {
+    future.catchError((Object e) {
+      debugPrint('Firestore write falhou: $e');
     });
   }
 }

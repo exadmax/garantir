@@ -1,7 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../alerts/warranty_alert_service.dart';
 import '../../auth/domain/auth_service.dart';
 import '../../categories/domain/category.dart';
 import '../../categories/presentation/categories_page.dart';
@@ -104,6 +106,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   final _repo = ProductRepository();
   final _auth = AuthService();
+  final _alertService = WarrantyAlertService();
 
   @override
   void initState() {
@@ -111,9 +114,26 @@ class _DashboardPageState extends State<DashboardPage> {
     _repo.seedDefaultCategories().catchError((Object e) {
       debugPrint('seedDefaultCategories: $e');
     });
-    _repo.syncIfNeeded().catchError((Object e) {
+    _syncAndRescheduleAlerts();
+  }
+
+  /// Sincroniza com o Firestore e reagenda as notificações locais — produtos
+  /// cadastrados na web também precisam alertar neste aparelho (no-op na web).
+  Future<void> _syncAndRescheduleAlerts() async {
+    try {
+      final synced = await _repo.syncIfNeeded();
+      if (!synced || kIsWeb) return;
+      final products = await _repo.getProductsOnce();
+      for (final p in products) {
+        await _alertService.scheduleWarrantyAlerts(
+          productId: p.id,
+          productName: p.name,
+          warrantyEndDate: p.warrantyEndDate,
+        );
+      }
+    } catch (e) {
       debugPrint('syncIfNeeded: $e');
-    });
+    }
   }
 
   @override
@@ -201,10 +221,12 @@ class _DashBody extends StatelessWidget {
                   badgeCount: nSoon + nExpired,
                   onSettings: () => _showSettings(context),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(top: -56),
+                // Pulls the cards up so they overlap the gradient header.
+                // (Negative EdgeInsets are not allowed — they assert in debug builds.)
+                Transform.translate(
+                  offset: const Offset(0, -56),
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [

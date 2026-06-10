@@ -8,4 +8,8 @@ class SyncMetaIsarSchema {
   Id id = 1;
 
   DateTime? lastSyncAt;
+
+  // Firebase Auth uid dos dados locais. Se outro usuário logar no mesmo
+  // aparelho, o Isar é limpo e re-sincronizado para não vazar dados.
+  String? uid;
 }

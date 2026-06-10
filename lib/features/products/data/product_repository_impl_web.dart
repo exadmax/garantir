@@ -89,5 +89,11 @@ class ProductRepository {
     }
   }
 
-  Future<void> syncIfNeeded() async {}
+  Future<List<Product>> getProductsOnce() async {
+    final snap = await _productsRef.orderBy('warrantyEndDate').get();
+    return snap.docs.map(Product.fromDoc).toList();
+  }
+
+  /// No-op on web — Firestore streams already keep the UI in sync.
+  Future<bool> syncIfNeeded() async => false;
 }

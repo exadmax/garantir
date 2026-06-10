@@ -19,7 +19,10 @@ Future<void> main() async {
 
   await FirebaseAppCheck.instance.activate(
     webProvider: ReCaptchaV3Provider('6LeWud4sAAAAAEzyrtnulPxqqnv3iqPLfwipZDct'),
-    androidProvider: AndroidProvider.debug,
+    // O provider debug só vale para builds de desenvolvimento; em release o
+    // token debug é rejeitado quando o App Check está em enforcement.
+    androidProvider:
+        kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
   );
 
   // Isar uses dart:ffi — not available on web.
