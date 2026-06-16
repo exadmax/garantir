@@ -5,56 +5,14 @@ import '../../alerts/warranty_alert_service.dart';
 import '../../categories/domain/category.dart';
 import '../data/product_repository.dart';
 import '../domain/product.dart';
+import 'product_detail_page.dart';
 import 'product_form_page.dart';
+import 'product_ui_helpers.dart';
 
-const _brand     = Color(0xFF1F6E8C);
-const _bg        = Color(0xFFF4F6F8);
-const _muted     = Color(0xFF6B7785);
-const _border    = Color(0xFFEEF1F4);
-
-// ─── Status helpers ───────────────────────────────────────────────────────────
-enum _Status { active, warn, soon, expired }
-
-_Status _status(Product p) {
-  final days = p.warrantyEndDate.difference(DateTime.now()).inDays;
-  if (days < 0) return _Status.expired;
-  if (days <= 30) return _Status.soon;
-  if (days <= 180) return _Status.warn;
-  return _Status.active;
-}
-
-int _days(Product p) => p.warrantyEndDate.difference(DateTime.now()).inDays;
-
-class _SC {
-  const _SC(this.dot, this.bg, this.text, this.label);
-  final Color dot, bg, text;
-  final String label;
-}
-
-const _sc = {
-  _Status.active:  _SC(Color(0xFF1F8A5B), Color(0xFFE6F5EE), Color(0xFF1F8A5B), 'Ativa'),
-  _Status.warn:    _SC(Color(0xFFC4A12B), Color(0xFFFBF5DE), Color(0xFF8A6F0F), 'Atenção'),
-  _Status.soon:    _SC(Color(0xFFE08A2B), Color(0xFFFCEEDC), Color(0xFF9C5B12), 'Vencendo'),
-  _Status.expired: _SC(Color(0xFF9AA5B2), Color(0xFFF1F3F5), Color(0xFF6B7785), 'Expirada'),
-};
-
-String _catEmoji(String catId, List<ProductCategory> cats) {
-  final cat = cats.where((c) => c.id == catId).firstOrNull;
-  if (cat == null) return '📦';
-  final n = _norm(cat.name);
-  if (n.contains('eletrodom')) return '🔌';
-  if (n.contains('eletr') || n.contains('celular')) return '📱';
-  if (n.contains('veiculo') || n.contains('carro') || n.contains('auto')) return '🚗';
-  if (n.contains('ferram')) return '🔧';
-  if (n.contains('movel') || n.contains('sofa')) return '🛋';
-  if (n.contains('servic')) return '🛠️';
-  return '📦';
-}
-
-String _norm(String s) => s.toLowerCase()
-    .replaceAll(RegExp('[áàâãä]'), 'a').replaceAll(RegExp('[éèêë]'), 'e')
-    .replaceAll(RegExp('[íìîï]'), 'i').replaceAll(RegExp('[óòôõö]'), 'o')
-    .replaceAll(RegExp('[úùûü]'), 'u').replaceAll('ç', 'c');
+const _brand = Color(0xFF1F6E8C);
+const _bg = Color(0xFFF4F6F8);
+const _muted = Color(0xFF6B7785);
+const _border = Color(0xFFEEF1F4);
 
 // ─── Filter chip enum ─────────────────────────────────────────────────────────
 enum _Filter { all, active, soon, expired }
@@ -94,21 +52,24 @@ class _ProductsPageState extends State<ProductsPage> {
   List<Product> _applyFilters(List<Product> all) {
     var list = all;
     if (_query.trim().isNotEmpty) {
-      final q = _norm(_query.trim());
-      list = list.where((p) => _norm(p.name).contains(q)).toList();
+      final q = normalize(_query.trim());
+      list = list.where((p) => normalize(p.name).contains(q)).toList();
     }
     switch (_filter) {
       case _Filter.all:
         break;
       case _Filter.active:
         list = list.where((p) {
-          final s = _status(p);
-          return s == _Status.active || s == _Status.warn;
+          final s = productStatus(p);
+          return s == ProductStatus.active || s == ProductStatus.warn;
         }).toList();
       case _Filter.soon:
-        list = list.where((p) => _status(p) == _Status.soon).toList();
+        list =
+            list.where((p) => productStatus(p) == ProductStatus.soon).toList();
       case _Filter.expired:
-        list = list.where((p) => _status(p) == _Status.expired).toList();
+        list = list
+            .where((p) => productStatus(p) == ProductStatus.expired)
+            .toList();
     }
     return list;
   }
@@ -131,10 +92,17 @@ class _ProductsPageState extends State<ProductsPage> {
                 return _StreamErrorView(error: snap.error);
               }
               final all = snap.data ?? const <Product>[];
-              final nActive   = all.where((p) { final s = _status(p); return s == _Status.active || s == _Status.warn; }).length;
-              final nSoon     = all.where((p) => _status(p) == _Status.soon).length;
-              final nExpired  = all.where((p) => _status(p) == _Status.expired).length;
-              final filtered  = _applyFilters(all);
+              final nActive = all.where((p) {
+                final s = productStatus(p);
+                return s == ProductStatus.active || s == ProductStatus.warn;
+              }).length;
+              final nSoon = all
+                  .where((p) => productStatus(p) == ProductStatus.soon)
+                  .length;
+              final nExpired = all
+                  .where((p) => productStatus(p) == ProductStatus.expired)
+                  .length;
+              final filtered = _applyFilters(all);
 
               return CustomScrollView(
                 slivers: [
@@ -142,13 +110,15 @@ class _ProductsPageState extends State<ProductsPage> {
                     searchCtrl: _searchCtrl,
                     onBack: () => Navigator.of(context).pop(),
                     onAdd: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(builder: (_) => const ProductFormPage()),
+                      MaterialPageRoute<void>(
+                          builder: (_) => const ProductFormPage()),
                     ),
                   ),
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                      child: _StatsStrip(total: all.length, nActive: nActive, nSoon: nSoon),
+                      child: _StatsStrip(
+                          total: all.length, nActive: nActive, nSoon: nSoon),
                     ),
                   ),
                   SliverToBoxAdapter(
@@ -167,9 +137,13 @@ class _ProductsPageState extends State<ProductsPage> {
                     ),
                   ),
                   if (!snap.hasData)
-                    const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+                    const SliverFillRemaining(
+                        child: Center(child: CircularProgressIndicator()))
                   else if (filtered.isEmpty)
-                    SliverFillRemaining(child: _EmptyState(isFiltered: _query.isNotEmpty || _filter != _Filter.all))
+                    SliverFillRemaining(
+                        child: _EmptyState(
+                            isFiltered:
+                                _query.isNotEmpty || _filter != _Filter.all))
                   else
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
@@ -181,7 +155,9 @@ class _ProductsPageState extends State<ProductsPage> {
                               product: filtered[i],
                               cats: cats,
                               onEdit: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(builder: (_) => ProductFormPage(existing: filtered[i])),
+                                MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        ProductFormPage(existing: filtered[i])),
                               ),
                               onDelete: () => _delete(filtered[i]),
                             ),
@@ -209,7 +185,8 @@ class _ProductsPageState extends State<ProductsPage> {
 
 // ─── Sticky header ────────────────────────────────────────────────────────────
 class _StickyHeader extends StatelessWidget {
-  const _StickyHeader({required this.searchCtrl, required this.onBack, required this.onAdd});
+  const _StickyHeader(
+      {required this.searchCtrl, required this.onBack, required this.onAdd});
   final TextEditingController searchCtrl;
   final VoidCallback onBack, onAdd;
 
@@ -225,7 +202,8 @@ class _StickyHeader extends StatelessWidget {
         background: Container(
           color: Colors.white,
           padding: EdgeInsets.fromLTRB(16, top + 16, 16, 0),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
               GestureDetector(
                 onTap: onBack,
@@ -234,7 +212,10 @@ class _StickyHeader extends StatelessWidget {
               const SizedBox(width: 12),
               const Expanded(
                 child: Text('Meus Produtos',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF1A1F26))),
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1F26))),
               ),
             ]),
             const SizedBox(height: 12),
@@ -245,7 +226,8 @@ class _StickyHeader extends StatelessWidget {
                 prefixIcon: const Icon(Icons.search, color: _muted),
                 filled: true,
                 fillColor: _bg,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: _border),
@@ -269,7 +251,8 @@ class _StickyHeader extends StatelessWidget {
 
 // ─── Stats strip ─────────────────────────────────────────────────────────────
 class _StatsStrip extends StatelessWidget {
-  const _StatsStrip({required this.total, required this.nActive, required this.nSoon});
+  const _StatsStrip(
+      {required this.total, required this.nActive, required this.nSoon});
   final int total, nActive, nSoon;
 
   @override
@@ -277,15 +260,20 @@ class _StatsStrip extends StatelessWidget {
     return Row(children: [
       Expanded(child: _StatCard(label: 'Total', value: total, color: _brand)),
       const SizedBox(width: 10),
-      Expanded(child: _StatCard(label: 'Ativas', value: nActive, color: const Color(0xFF1F8A5B))),
+      Expanded(
+          child: _StatCard(
+              label: 'Ativas', value: nActive, color: const Color(0xFF1F8A5B))),
       const SizedBox(width: 10),
-      Expanded(child: _StatCard(label: 'Vencendo', value: nSoon, color: const Color(0xFFE08A2B))),
+      Expanded(
+          child: _StatCard(
+              label: 'Vencendo', value: nSoon, color: const Color(0xFFE08A2B))),
     ]);
   }
 }
 
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.label, required this.value, required this.color});
+  const _StatCard(
+      {required this.label, required this.value, required this.color});
   final String label;
   final int value;
   final Color color;
@@ -300,7 +288,12 @@ class _StatCard extends StatelessWidget {
         border: Border.all(color: _border),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('$value', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color, height: 1.0)),
+        Text('$value',
+            style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: color,
+                height: 1.0)),
         const SizedBox(height: 2),
         Text(label, style: const TextStyle(fontSize: 11, color: _muted)),
       ]),
@@ -310,7 +303,8 @@ class _StatCard extends StatelessWidget {
 
 // ─── Filter chips ─────────────────────────────────────────────────────────────
 class _FilterChips extends StatelessWidget {
-  const _FilterChips({required this.selected, required this.counts, required this.onSelect});
+  const _FilterChips(
+      {required this.selected, required this.counts, required this.onSelect});
   final _Filter selected;
   final Map<_Filter, int> counts;
   final ValueChanged<_Filter> onSelect;
@@ -333,7 +327,8 @@ class _FilterChips extends StatelessWidget {
             child: GestureDetector(
               onTap: () => onSelect(opt.$1),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
                   color: active ? _brand : Colors.white,
                   borderRadius: BorderRadius.circular(999),
@@ -342,7 +337,8 @@ class _FilterChips extends StatelessWidget {
                 child: Text(
                   '${opt.$2} ${counts[opt.$1] ?? 0}',
                   style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
                     color: active ? Colors.white : _muted,
                   ),
                 ),
@@ -358,8 +354,10 @@ class _FilterChips extends StatelessWidget {
 // ─── Product card ─────────────────────────────────────────────────────────────
 class _ProductCard extends StatelessWidget {
   const _ProductCard({
-    required this.product, required this.cats,
-    required this.onEdit, required this.onDelete,
+    required this.product,
+    required this.cats,
+    required this.onEdit,
+    required this.onDelete,
   });
   final Product product;
   final List<ProductCategory> cats;
@@ -367,17 +365,21 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final st = _status(product);
-    final sc = _sc[st]!;
-    final days = _days(product);
+    final st = productStatus(product);
+    final sc = statusColors[st]!;
+    final days = daysRemaining(product);
     final fmt = DateFormat('dd/MM/yyyy');
 
     // Progress bar: how much of the warranty life remains (relative to purchase date)
-    final totalDays = product.warrantyEndDate.difference(product.purchaseDate).inDays;
+    final totalDays =
+        product.warrantyEndDate.difference(product.purchaseDate).inDays;
     final elapsed = DateTime.now().difference(product.purchaseDate).inDays;
-    final progress = totalDays > 0 ? (elapsed / totalDays).clamp(0.0, 1.0) : 1.0;
-    final emoji = _catEmoji(product.categoryId, cats);
-    final catName = cats.where((c) => c.id == product.categoryId).firstOrNull?.name ?? 'Sem categoria';
+    final progress =
+        totalDays > 0 ? (elapsed / totalDays).clamp(0.0, 1.0) : 1.0;
+    final emoji = categoryEmoji(product.categoryId, cats);
+    final catName =
+        cats.where((c) => c.id == product.categoryId).firstOrNull?.name ??
+            'Sem categoria';
 
     return Container(
       decoration: BoxDecoration(
@@ -385,90 +387,133 @@ class _ProductCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _border),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Icon
-            Container(
-              width: 44, height: 44,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF4F6F8),
-                borderRadius: BorderRadius.circular(10),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+              builder: (_) => ProductDetailPage(product: product, cats: cats)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // Icon
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F6F8),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: Text(emoji, style: const TextStyle(fontSize: 22)),
               ),
-              alignment: Alignment.center,
-              child: Text(emoji, style: const TextStyle(fontSize: 22)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(product.name,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF1A1F26))),
-              const SizedBox(height: 2),
-              Text(catName, style: const TextStyle(fontSize: 12, color: _muted)),
-            ])),
-            // Status chip
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-              decoration: BoxDecoration(color: sc.bg, borderRadius: BorderRadius.circular(999)),
-              child: Text(sc.label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: sc.text)),
-            ),
-          ]),
-          const SizedBox(height: 12),
-          // Progress bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 5,
-              backgroundColor: const Color(0xFFEEF1F4),
-              valueColor: AlwaysStoppedAnimation<Color>(sc.dot),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(children: [
-            Text(
-              days < 0
-                  ? 'Expirou em ${fmt.format(product.warrantyEndDate)}'
-                  : 'Vence em ${fmt.format(product.warrantyEndDate)}',
-              style: const TextStyle(fontSize: 12, color: _muted),
-            ),
-            const Spacer(),
-            Text(
-              days < 0
-                  ? 'Expirada'
-                  : days == 0
-                      ? 'Expira hoje!'
-                      : '$days dias restantes',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: sc.dot),
-            ),
-          ]),
-          const SizedBox(height: 10),
-          const Divider(height: 1, color: _border),
-          const SizedBox(height: 8),
-          Row(children: [
-            TextButton.icon(
-              onPressed: onEdit,
-              icon: const Icon(Icons.edit_outlined, size: 15),
-              label: const Text('Editar'),
-              style: TextButton.styleFrom(
-                foregroundColor: _brand, textStyle: const TextStyle(fontSize: 12),
-                padding: EdgeInsets.zero, minimumSize: const Size(0, 0),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              const SizedBox(width: 12),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(product.name,
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1A1F26))),
+                    const SizedBox(height: 2),
+                    Text(catName,
+                        style: const TextStyle(fontSize: 12, color: _muted)),
+                  ])),
+              // Status chip
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                    color: sc.bg, borderRadius: BorderRadius.circular(999)),
+                child: Text(sc.label,
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: sc.text)),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            // Progress bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 5,
+                backgroundColor: const Color(0xFFEEF1F4),
+                valueColor: AlwaysStoppedAnimation<Color>(sc.dot),
               ),
             ),
-            const SizedBox(width: 16),
-            TextButton.icon(
-              onPressed: onDelete,
-              icon: const Icon(Icons.delete_outline, size: 15),
-              label: const Text('Excluir'),
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFE05555), textStyle: const TextStyle(fontSize: 12),
-                padding: EdgeInsets.zero, minimumSize: const Size(0, 0),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            const SizedBox(height: 8),
+            Row(children: [
+              Text(
+                days < 0
+                    ? 'Expirou em ${fmt.format(product.warrantyEndDate)}'
+                    : 'Vence em ${fmt.format(product.warrantyEndDate)}',
+                style: const TextStyle(fontSize: 12, color: _muted),
               ),
-            ),
+              const Spacer(),
+              Text(
+                days < 0
+                    ? 'Expirada'
+                    : days == 0
+                        ? 'Expira hoje!'
+                        : '$days dias restantes',
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600, color: sc.dot),
+              ),
+            ]),
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: _border),
+            const SizedBox(height: 8),
+            Row(children: [
+              TextButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                      builder: (_) =>
+                          ProductDetailPage(product: product, cats: cats)),
+                ),
+                icon: const Icon(Icons.visibility_outlined, size: 15),
+                label: const Text('Visualizar'),
+                style: TextButton.styleFrom(
+                  foregroundColor: _brand,
+                  textStyle: const TextStyle(fontSize: 12),
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+              const SizedBox(width: 16),
+              TextButton.icon(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 15),
+                label: const Text('Editar'),
+                style: TextButton.styleFrom(
+                  foregroundColor: _brand,
+                  textStyle: const TextStyle(fontSize: 12),
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+              const SizedBox(width: 16),
+              TextButton.icon(
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline, size: 15),
+                label: const Text('Excluir'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFE05555),
+                  textStyle: const TextStyle(fontSize: 12),
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ]),
           ]),
-        ]),
+        ),
       ),
     );
   }
@@ -486,12 +531,19 @@ class _EmptyState extends StatelessWidget {
         const Text('📦', style: TextStyle(fontSize: 52)),
         const SizedBox(height: 16),
         Text(
-          isFiltered ? 'Nenhum produto encontrado' : 'Nenhum produto cadastrado',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1A1F26)),
+          isFiltered
+              ? 'Nenhum produto encontrado'
+              : 'Nenhum produto cadastrado',
+          style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1A1F26)),
         ),
         const SizedBox(height: 6),
         Text(
-          isFiltered ? 'Tente outra busca ou filtro' : 'Cadastre seu primeiro produto',
+          isFiltered
+              ? 'Tente outra busca ou filtro'
+              : 'Cadastre seu primeiro produto',
           style: const TextStyle(fontSize: 13, color: _muted),
         ),
       ]),
@@ -515,7 +567,10 @@ class _StreamErrorView extends StatelessWidget {
           const Text(
             'Não foi possível carregar os dados',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1A1F26)),
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF1A1F26)),
           ),
           const SizedBox(height: 8),
           Text(

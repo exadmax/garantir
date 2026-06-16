@@ -122,10 +122,28 @@ class _ProductFormPageState extends State<ProductFormPage> {
     setState(() => _isSaving = true);
     try {
       final id = widget.existing?.id ?? _uuid.v4();
+
+      // Try to upload the image, but do not block the save if it fails.
       var noteUrl = _noteImageUrl;
       if (_selectedImage != null) {
-        noteUrl = await _invoiceService.uploadInvoiceImage(productId: id, image: _selectedImage!);
+        try {
+          noteUrl = await _invoiceService.uploadInvoiceImage(
+              productId: id, image: _selectedImage!);
+        } catch (uploadErr) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Foto não enviada: ${_uploadErrorMessage(uploadErr)}. '
+                  'O produto será salvo sem ela.',
+                ),
+                duration: const Duration(seconds: 5),
+              ),
+            );
+          }
+        }
       }
+
       final product = Product(
         id: id,
         name: _nameController.text.trim(),
@@ -137,11 +155,16 @@ class _ProductFormPageState extends State<ProductFormPage> {
         description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
       );
       await _repo.saveProduct(product);
-      await _alertService.scheduleWarrantyAlerts(
+
+      // Schedule alerts without blocking the save on Android.
+      _alertService.scheduleWarrantyAlerts(
         productId: id,
         productName: product.name,
         warrantyEndDate: product.warrantyEndDate,
-      );
+      ).catchError((Object e) {
+        debugPrint('Erro ao agendar alerta: $e');
+      });
+
       if (mounted) Navigator.of(context).pop();
     } catch (err) {
       if (mounted) {
@@ -152,6 +175,21 @@ class _ProductFormPageState extends State<ProductFormPage> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  String _uploadErrorMessage(Object err) {
+    final msg = err.toString().toLowerCase();
+    if (msg.contains('token') ||
+        msg.contains('app-check') ||
+        msg.contains('app check') ||
+        msg.contains('unauthorized') ||
+        msg.contains('permission')) {
+      return 'Erro de permissão no servidor';
+    }
+    if (msg.contains('timeout') || msg.contains('tempo')) {
+      return 'Tempo de conexão esgotado';
+    }
+    return 'Verifique sua conexão e tente novamente';
   }
 
   @override
